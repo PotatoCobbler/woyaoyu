@@ -22,7 +22,7 @@ const RESTRICTED_AREAS = [
   [[0,0],[3,0],[3,30],[27,30],[27,36],[0,36]],
   [[3,3],[18.7,3],[18.7,14],[3,14]],
   [[3,17],[4.5,17],[4.5,20],[10.8,20],[10.8,27],[6,27],[6,30],[3,30]],
-  [[3,0],[9.7,0],[9.7,4],[3,4]],
+  [[3,0],[18.7,0],[18.7,4],[3,4]],
   [[31.8,7],[37,7],[37,10.5],[31.8,10.5]]
 ];
 
@@ -84,6 +84,7 @@ const state = {
   caughtFish: null,
   carriedFish: null,
   score: 0,
+  purpleSquidCount: 0,
   yellowFishCaught: false,
   playerInWater: false,
   spawnAttemptAvailable: true,
@@ -163,6 +164,7 @@ function resetGame() {
   state.caughtFish = null;
   state.carriedFish = null;
   state.score = 0;
+  state.purpleSquidCount = 0;
   state.yellowFishCaught = false;
   state.playerInWater = false;
   state.spawnAttemptAvailable = true;
@@ -254,10 +256,13 @@ function catchFish(x, y, caughtBy) {
   let name, color;
 
   if (kind === "squid") {
-    [name, color] = chooseSquidColor();
+      [name, color] = chooseSquidColor();
   } else {
-    [name, color] = chooseFishColor();
-    if (name === "yellow") state.yellowFishCaught = true;
+      [name, color] = chooseFishColor();
+
+      if (name === "yellow") {
+          state.yellowFishCaught = true;
+      }
   }
 
   const creature = {x, y, kind, color, name};
@@ -277,8 +282,20 @@ function catchFish(x, y, caughtBy) {
 
 function tryDeliverFish() {
   if (!state.carriedFish) return;
+
   const [fx, fy] = FISHERMAN_POS;
-  if (Math.abs(state.player[0]-fx) <= 1 && Math.abs(state.player[1]-fy) <= 3) {
+
+  if (
+    Math.abs(state.player[0] - fx) <= 1 &&
+    Math.abs(state.player[1] - fy) <= 3
+  ) {
+  if (
+    state.carriedFish.kind === "squid" &&
+    state.carriedFish.name === "purple"
+  ) {
+    state.purpleSquidCount += 1;
+}
+
     state.carriedFish = null;
     state.caughtBy = null;
     state.score += 1;
@@ -506,6 +523,14 @@ function drawHUD() {
   ctx.fillStyle = "#30251e";
   ctx.font = "bold 15px sans-serif";
   ctx.fillText("重新開始", (x1+x2)/2, (y1+y2)/2);
+
+  roundedRect(157, 12, 292, 52, 9, "#f7f2df", "#43506c", 2);
+
+  ctx.fillStyle = "#303047";
+  ctx.font = "bold 18px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(`金魚 ${state.purpleSquidCount}`, 224.5, 32);
 
   if (state.worldFrozen) {
     const boxWidth = 640 - RIVER_X0 * SOURCE_BLOCK * RENDER_SCALE - 20;
