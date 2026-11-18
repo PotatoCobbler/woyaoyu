@@ -48,7 +48,7 @@ canvas.tabIndex = 0;
 
 const assets = {};
 const assetNames = [
-  "fish", "background_boulder",
+  "fish", "dummyfish", "background_boulder",
   "NPC_boy_left","NPC_boy_right",
   "NPC_girl_left","NPC_girl_right",
   "NPC_green_girl_left","NPC_green_girl_right",
@@ -92,6 +92,7 @@ const state = {
   caughtBy: null,
   npcTimer: 0,
   fishTimer: 0,
+  dummyFishMode: false,
   showCollisionDebug: false,
   npcs: []
 };
@@ -444,17 +445,31 @@ function drawNPCs() {
 }
 
 function drawFish() {
-  if (state.fish) drawSpriteCentered(assets.fish, state.fish.x, state.fish.y);
+  if (state.fish) {
+    const fishImage = state.dummyFishMode
+      ? assets.dummyfish
+      : assets.fish;
+
+    drawSpriteCentered(
+      fishImage,
+      state.fish.x,
+      state.fish.y
+    );
+  }
+
   if (state.caughtFish) {
     drawSpriteCentered(
       creatureImage(state.caughtFish),
-      state.caughtFish.x, state.caughtFish.y
+      state.caughtFish.x,
+      state.caughtFish.y
     );
   }
+
   if (state.carriedFish) {
     drawSpriteCentered(
       creatureImage(state.carriedFish),
-      state.player[0], state.player[1]
+      state.player[0],
+      state.player[1]
     );
   }
 }
@@ -613,8 +628,14 @@ function tick(now) {
 window.addEventListener("keydown", event => {
   const key = event.key.toLowerCase();
 
-  if (["arrowleft","arrowright","arrowup","arrowdown"," ","w","a","s","d","r","f3"].includes(key)) {
+  if (["arrowleft","arrowright","arrowup","arrowdown"," ","w","a","s","d","r","f1","f3"].includes(key)) {
     event.preventDefault();
+  }
+
+  if (key === "f1") {
+    state.dummyFishMode = !state.dummyFishMode;
+    draw();
+    return;
   }
 
   if (key === "f3") {
