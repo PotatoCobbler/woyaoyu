@@ -41,6 +41,17 @@ const SQUID_COLORS = {
   yellow: 0.50
 };
 
+const ANTI_CHEAT_CHARACTERS = [
+  "魬","𩵩","䰷","䰾","䰼","漁","鮀","䱃",
+  "䱈","𩶓","漁","䱉","鯉","鯛","鰻","鯰",
+  "鯨","鮪","蝦","蟹","鮙","𩶤","鮥","鮟",
+  "鮞","鮝","𩶲","鱘","鮵","鮶","鮷","鮸",
+  "鮽","鮾","鮿","鯀","鯁","鯂","鯃","鯄",
+  "鯅","鯆","鯇","鯉","鯊","鯋","鯌","鯍",
+  "鯎","鯏","鯑","鯒","鯓","鯽","䱏","䱐",
+  "䱑","䱒","䱓","䱔","䱕","䱖","䱗","𩷒"
+];
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = true;
@@ -192,35 +203,114 @@ function trySpawnFish() {
   return true;
 }
 
-function chooseFishColor() {
+function getFishProbabilities() {
   const x = state.score;
-  const orange = Math.max(0.25 - 0.005*x, 0);
+
+  const orange = Math.max(0.25 - 0.005 * x, 0);
   const blue = 0.10;
   const purple = Math.max(
-    0.90 * Math.sin((x * Math.PI) / 15) - 0.20 - 0.01*x, 0
+    0.90 * Math.sin((x * Math.PI) / 15) - 0.20 - 0.01 * x,
+    0
   );
   const yellow = Math.min(0.0014 * x * Math.sqrt(x), 0.5);
-  const red = Math.max(1.0 - orange - blue - purple - yellow, 0);
+  const red = Math.max(
+    1.0 - orange - blue - purple - yellow,
+    0
+  );
+
+  return {
+    orange,
+    blue,
+    purple,
+    yellow,
+    red
+  };
+}
+
+function chooseFishColor() {
+  const probabilities = getFishProbabilities();
 
   const names = ["orange","blue","purple","yellow","red"];
-  const probabilities = [orange,blue,purple,yellow,red];
-  const total = probabilities.reduce((a,b)=>a+b,0);
+  const weights = [
+    probabilities.orange,
+    probabilities.blue,
+    probabilities.purple,
+    probabilities.yellow,
+    probabilities.red
+  ];
+
+  const total = weights.reduce((a,b) => a + b, 0);
+
   let r = Math.random() * total;
-  for (let i=0; i<names.length; i++) {
-    r -= probabilities[i];
-    if (r <= 0) return [names[i], FISH_COLORS[names[i]]];
+
+  for (let i = 0; i < names.length; i++) {
+    r -= weights[i];
+
+    if (r <= 0) {
+      return [names[i], FISH_COLORS[names[i]]];
+    }
   }
+
   return ["red", FISH_COLORS.red];
 }
 
+function getSquidProbabilities() {
+  return {
+    red: 0.20,
+    blue: 0.30,
+    purple: 0.01,
+    yellow: 0.50
+  };
+}
+
 function chooseSquidColor() {
-  const names = Object.keys(SQUID_COLORS);
-  let r = Math.random();
-  for (const name of names) {
-    r -= SQUID_COLORS[name];
-    if (r <= 0) return [name, FISH_COLORS[name]];
+  const probabilities = getSquidProbabilities();
+  const names = Object.keys(probabilities);
+
+  const weights = names.map(name => probabilities[name]);
+
+  let r = Math.random() * weights.reduce((a,b) => a + b, 0);
+
+  for (let i = 0; i < names.length; i++) {
+    r -= weights[i];
+
+    if (r <= 0) {
+      const name = names[i];
+      return [name, FISH_COLORS[name]];
+    }
   }
+
   return ["yellow", FISH_COLORS.yellow];
+}
+
+function getAntiCheatCharacter() {
+  const fish = getFishProbabilities();
+  const squid = getSquidProbabilities();
+  const values = [
+    Math.round(fish.orange * 1000000),
+    Math.round(fish.blue   * 1000000),
+    Math.round(fish.purple * 1000000),
+    Math.round(fish.yellow * 1000000),
+    Math.round(fish.red    * 1000000),
+
+    Math.round(squid.red    * 1000000),
+    Math.round(squid.blue   * 1000000),
+    Math.round(squid.purple * 1000000),
+    Math.round(squid.yellow * 1000000)
+  ];
+
+  let hash = 2166136261;
+
+  for (const value of values) {
+    hash ^= value & 0xffffffff;
+    hash = Math.imul(hash, 16777619);
+  }
+
+  hash >>>= 0;
+
+  const index = hash % ANTI_CHEAT_CHARACTERS.length;
+
+  return ANTI_CHEAT_CHARACTERS[index];
 }
 
 function checkAllCatches() {
@@ -525,47 +615,130 @@ function roundedRect(x1,y1,x2,y2,r,fill,outline,width=3) {
 
 function drawHUD() {
   roundedRect(17,12,152,52,9,"#f7f2df","#43506c",2);
+
   ctx.fillStyle = "#303047";
   ctx.font = "bold 18px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+
   ctx.fillText(`魚 ${state.score}`, 84.5, 32);
 
   const x1=14, y1=511, x2=118, y2=552;
-  roundedRect(x1+2.5,y1+3,x2+2.5,y2+3,6,"#744b2d","#744b2d",1);
-  const buttonColor = state.worldFrozen ? "#f6a52f" : "#bdbdbd";
-  roundedRect(x1,y1,x2,y2,6,buttonColor,"#fff0c8",2);
+
+  roundedRect(
+    x1+2.5,y1+3,x2+2.5,y2+3,
+    6,
+    "#744b2d",
+    "#744b2d",
+    1
+  );
+
+  const buttonColor =
+    state.worldFrozen ? "#f6a52f" : "#bdbdbd";
+
+  roundedRect(
+    x1,y1,x2,y2,
+    6,
+    buttonColor,
+    "#fff0c8",
+    2
+  );
+
   ctx.fillStyle = "#30251e";
   ctx.font = "bold 15px sans-serif";
-  ctx.fillText("重新開始", (x1+x2)/2, (y1+y2)/2);
 
-  roundedRect(157, 12, 292, 52, 9, "#f7f2df", "#43506c", 2);
+  ctx.fillText(
+    "重新開始",
+    (x1+x2)/2,
+    (y1+y2)/2
+  );
+
+  roundedRect(
+    157, 12, 292, 52,
+    9,
+    "#f7f2df",
+    "#43506c",
+    2
+  );
 
   ctx.fillStyle = "#303047";
   ctx.font = "bold 18px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`金魚 ${state.purpleSquidCount}`, 224.5, 32);
+
+  ctx.fillText(
+    `金魚 ${state.purpleSquidCount}`,
+    224.5,
+    32
+  );
+
+	const antiCheatChar = getAntiCheatCharacter();
+
+	ctx.beginPath();
+	ctx.arc(582, 537, 25, 0, Math.PI * 2);
+	ctx.fillStyle = "#f7f2df";
+	ctx.fill();
+	ctx.strokeStyle = "#43506c";
+	ctx.lineWidth = 2;
+	ctx.stroke();
+
+	ctx.fillStyle = "#303047";
+	ctx.font = "bold 23px sans-serif";
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+
+	ctx.fillText(
+	  antiCheatChar,
+	  582,
+	  537
+	);
 
   if (state.worldFrozen) {
-    const boxWidth = 640 - RIVER_X0 * SOURCE_BLOCK * RENDER_SCALE - 20;
+    const boxWidth =
+      640 -
+      RIVER_X0 * SOURCE_BLOCK * RENDER_SCALE -
+      20;
+
     const boxHeight = 35;
+
     const bx1 = 320 - boxWidth/2;
     const bx2 = 320 + boxWidth/2;
     const by1 = 288 - boxHeight/2;
     const by2 = 288 + boxHeight/2;
 
-    roundedRect(bx1,by1,bx2,by2,6,"#f7f2df","#a95035",1.5);
+    roundedRect(
+      bx1,by1,bx2,by2,
+      6,
+      "#f7f2df",
+      "#a95035",
+      1.5
+    );
+
     ctx.fillStyle = "#a95035";
     ctx.font = "bold 15px sans-serif";
-    ctx.fillText("抓到魚了!", 320, 288);
+
+    ctx.fillText(
+      "抓到魚了!",
+      320,
+      288
+    );
   }
 
   if (state.carriedFish) {
-    roundedRect(215,538,425,559,5,"#f7f2df","#4d5b67",1);
+    roundedRect(
+      215,538,425,559,
+      5,
+      "#f7f2df",
+      "#4d5b67",
+      1
+    );
+
     ctx.fillStyle = "#2e2a27";
     ctx.font = "bold 15px sans-serif";
-    ctx.fillText("「把魚帶到市場攤位」", 320, 548.5);
+
+    ctx.fillText(
+      "「把魚帶到市場攤位」",
+      320,
+      548.5
+    );
   }
 }
 
