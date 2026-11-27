@@ -101,6 +101,7 @@ const state = {
   spawnAttemptAvailable: true,
   worldFrozen: false,
   caughtBy: null,
+  merchantSpeech: null,
   npcTimer: 0,
   fishTimer: 0,
   dummyFishMode: false,
@@ -183,6 +184,7 @@ function resetGame() {
   state.spawnAttemptAvailable = true;
   state.worldFrozen = false;
   state.caughtBy = null;
+  state.merchantSpeech = null;
   state.npcTimer = 0;
   state.fishTimer = 0;
   generateNPCs();
@@ -322,12 +324,10 @@ function getAntiCheatCharacter() {
     hash = Math.imul(hash, 16777619);
   }
 
-  // Mix probability configuration
   for (const value of values) {
     mix(value);
   }
 
-  // Mix actual catch history
   for (const entry of state.catchHistory) {
     mix(kindCodes[entry.kind]);
     mix(colorCodes[entry.color]);
@@ -400,13 +400,36 @@ function catchFish(x, y, caughtBy) {
     state.worldFrozen = true;
   }
   
-  // Record the actual catch
   state.catchHistory.push({
     kind,
     color: name,
     score: state.score
   });
 
+}
+
+function getMerchantSpeech(score) {
+  if (score >= 3 && score <= 10) {
+    return "哇！你該不會是在作弊吧？";
+  }
+
+  if (score > 10 && score <= 100) {
+    return "哇！你最近真走運！";
+  }
+
+  if (score > 100 && score <= 200) {
+    return "我沒想到你竟然找到了金魚！";
+  }
+
+  if (score > 200 && score <= 300) {
+    return "終於抓到金魚了！";
+  }
+
+  if (score > 300) {
+    return "我還以為你永遠都抓不到金魚呢！";
+  }
+
+  return null;
 }
 
 function tryDeliverFish() {
@@ -418,12 +441,16 @@ function tryDeliverFish() {
     Math.abs(state.player[0] - fx) <= 1 &&
     Math.abs(state.player[1] - fy) <= 3
   ) {
-  if (
-    state.carriedFish.kind === "squid" &&
-    state.carriedFish.name === "purple"
-  ) {
-    state.purpleSquidCount += 1;
-}
+
+    state.merchantSpeech = null;
+
+    if (
+      state.carriedFish.kind === "squid" &&
+      state.carriedFish.name === "purple"
+    ) {
+      state.purpleSquidCount += 1;
+      state.merchantSpeech = getMerchantSpeech(state.score);
+    }
 
     state.carriedFish = null;
     state.caughtBy = null;
@@ -651,6 +678,70 @@ function roundedRect(x1,y1,x2,y2,r,fill,outline,width=3) {
   }
 }
 
+function drawMerchantSpeech() {
+  if (!state.merchantSpeech) return;
+
+  const x1 = 190;
+  const y1 = 62;
+  const x2 = 375;
+  const y2 = 112;
+
+  roundedRect(
+    x1, y1, x2, y2,
+    8,
+    "#f7f2df",
+    "#43506c",
+    2
+  );
+
+  ctx.beginPath();
+  ctx.moveTo(x1 + 18, y2);
+  ctx.lineTo(x1 + 32, y2);
+  ctx.lineTo(x1 + 20, y2 + 12);
+  ctx.closePath();
+  ctx.fillStyle = "#f7f2df";
+  ctx.fill();
+  ctx.strokeStyle = "#43506c";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#303047";
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const words = state.merchantSpeech.split(" ");
+  const lines = [];
+  let current = "";
+  const maxWidth = x2 - x1 - 16;
+
+  for (const word of words) {
+    const test = current ? current + " " + word : word;
+
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+
+  if (current) lines.push(current);
+
+  const lineHeight = 14;
+  const startY =
+    (y1 + y2) / 2 -
+    ((lines.length - 1) * lineHeight) / 2;
+
+  lines.forEach((line, i) => {
+    ctx.fillText(
+      line,
+      (x1 + x2) / 2,
+      startY + i * lineHeight
+    );
+  });
+}
+
 function drawHUD() {
   roundedRect(17,12,152,52,9,"#f7f2df","#43506c",2);
 
@@ -778,6 +869,8 @@ function drawHUD() {
       548.5
     );
   }
+
+  drawMerchantSpeech();
 }
 
 function drawCollisionDebug() {
