@@ -105,7 +105,8 @@ const state = {
   fishTimer: 0,
   dummyFishMode: false,
   showCollisionDebug: false,
-  npcs: []
+  npcs: [],
+  catchHistory: []
 };
 
 function randomChoice(items) {
@@ -186,6 +187,7 @@ function resetGame() {
   state.fishTimer = 0;
   generateNPCs();
   draw();
+  state.catchHistory = [];
 }
 
 function trySpawnFish() {
@@ -286,24 +288,50 @@ function chooseSquidColor() {
 function getAntiCheatCharacter() {
   const fish = getFishProbabilities();
   const squid = getSquidProbabilities();
+
   const values = [
     Math.round(fish.orange * 1000000),
-    Math.round(fish.blue   * 1000000),
+    Math.round(fish.blue * 1000000),
     Math.round(fish.purple * 1000000),
     Math.round(fish.yellow * 1000000),
-    Math.round(fish.red    * 1000000),
+    Math.round(fish.red * 1000000),
 
-    Math.round(squid.red    * 1000000),
-    Math.round(squid.blue   * 1000000),
+    Math.round(squid.red * 1000000),
+    Math.round(squid.blue * 1000000),
     Math.round(squid.purple * 1000000),
     Math.round(squid.yellow * 1000000)
   ];
 
+  const colorCodes = {
+    orange: 1,
+    blue: 2,
+    purple: 3,
+    yellow: 4,
+    red: 5
+  };
+
+  const kindCodes = {
+    fish: 1,
+    squid: 2
+  };
+
   let hash = 2166136261;
 
-  for (const value of values) {
-    hash ^= value & 0xffffffff;
+  function mix(value) {
+    hash ^= value;
     hash = Math.imul(hash, 16777619);
+  }
+
+  // Mix probability configuration
+  for (const value of values) {
+    mix(value);
+  }
+
+  // Mix actual catch history
+  for (const entry of state.catchHistory) {
+    mix(kindCodes[entry.kind]);
+    mix(colorCodes[entry.color]);
+    mix(entry.score);
   }
 
   hash >>>= 0;
@@ -340,6 +368,7 @@ function checkPlayerFrontCatch() {
   if (front) catchFish(fx, fy, "PLAYER");
 }
 
+
 function catchFish(x, y, caughtBy) {
   if (!state.fish) return;
 
@@ -347,16 +376,17 @@ function catchFish(x, y, caughtBy) {
   let name, color;
 
   if (kind === "squid") {
-      [name, color] = chooseSquidColor();
+    [name, color] = chooseSquidColor();
   } else {
-      [name, color] = chooseFishColor();
+    [name, color] = chooseFishColor();
 
-      if (name === "yellow") {
-          state.yellowFishCaught = true;
-      }
+    if (name === "yellow") {
+      state.yellowFishCaught = true;
+    }
   }
 
   const creature = {x, y, kind, color, name};
+
   state.fish = null;
   state.fishTimer = 0;
   state.caughtBy = caughtBy;
@@ -369,6 +399,14 @@ function catchFish(x, y, caughtBy) {
     state.carriedFish = null;
     state.worldFrozen = true;
   }
+  
+  // Record the actual catch
+  state.catchHistory.push({
+    kind,
+    color: name,
+    score: state.score
+  });
+
 }
 
 function tryDeliverFish() {
